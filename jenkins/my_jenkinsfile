@@ -1,0 +1,82 @@
+pipeline {
+    agent any
+    
+    environment {
+        DOCKER_IMAGE = 'akash'
+        VERSION_FILE = 'version.txt'
+        AWS_DEFAULT_REGION = 'ap-south-1' // Specify your AWS region
+        ECR_REPO_URL = '230079820631.dkr.ecr.ap-south-1.amazonaws.com/demo/akash' // Specify the URL of your ECR repository
+       // DOCKER_IMAGE_NAME = 'akash' // Name of your Docker image
+        DOCKER_TAG = 'latest' // Tag of your Docker image
+    }
+    
+    tools {
+        git 'git'
+    }
+    
+    stages {
+        stage('Code checkout') {
+            steps {
+                echo 'Source Code Checkout '
+                checkout scmGit(branches: [[name: '*/master']], extensions: [], gitTool: 'Default', userRemoteConfigs: [[credentialsId: 'akashd', url: 'https://github.com/akashdeshmukh01/simple-node-js-react-npm-app.git']])
+            }
+        }
+        
+        stage('Install dependency') {
+            steps {
+                echo 'Installing Dependency'
+                sh 'npm install'
+            }
+        }
+        
+        //stage('Read and Increment Version') {
+          //  steps {
+            //    echo "Versioning Step"
+              //  script {
+                    // Read the current version from the VERSION file
+                //    currentVersion = readFile(VERSION_FILE).trim()
+                  //  echo "Current version: ${currentVersion}"
+
+                    // Split the version number and increment the last part
+                    //def versionParts = currentVersion.tokenize('.')
+                //    versionParts[-1] = (versionParts[-1] as int) + 1
+                  //  newVersion = versionParts.join('.')
+                //    echo "New version: ${newVersion}"
+
+                    // Write the new version back to the VERSION file
+                   // writeFile(file: VERSION_FILE, text: newVersion)
+            //    }
+        //    }
+    //    }
+        
+       stage('Build & Tag Docker Image') {
+            steps {
+                echo "Build Docker Image"
+               script {
+                    // Build Docker image 
+                    sh "docker build -t ${DOCKER_IMAGE} ."
+                    echo "${DOCKER_IMAGE}"
+                }
+            }
+        }
+        
+        stage('Push Docker Image to ECR') {
+            steps {
+                script {
+                    // Log in to ECR using AWS CLI
+                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', accessKeyVariable: 'AWS_ACCESS_KEY_ID', credentialsId: 'AWS Credentials', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']]) {
+                        sh "aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_REPO_URL}"
+                    }
+                    // Tag Docker image for ECR repository
+                  //  sh "docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${ECR_REPO_URL}/${DOCKER_IMAGE}:${DOCKER_TAG}"
+                      sh "docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${ECR_REPO_URL}:${DOCKER_TAG}"
+                    echo "${ECR_REPO_URL}:${DOCKER_TAG}"
+                    
+                    // Push Docker image to ECR repository
+                  //  sh "docker push ${ECR_REPO_URL}/${DOCKER_IMAGE}:${DOCKER_TAG}"
+                    sh "docker push ${ECR_REPO_URL}"
+                }
+            }
+        }
+    }
+}
